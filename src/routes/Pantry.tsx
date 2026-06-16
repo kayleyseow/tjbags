@@ -180,7 +180,7 @@ export default function Pantry() {
   useEffect(() => {
     if (!bags) return
     for (const bag of bags) {
-      const heroSrc = bag.photos[0]
+      const heroSrc = heroSrcFor(bag, encyclopediaById)
       if (!heroSrc) continue
       if (photoAspects.has(heroSrc)) continue
       const url = resolvePhotoUrl(heroSrc)
@@ -197,7 +197,7 @@ export default function Pantry() {
       }
       img.src = url
     }
-  }, [bags, photoAspects])
+  }, [bags, photoAspects, encyclopediaById])
 
   // Assign each bag a frame using least-used-from-compatible-set. Iterates in
   // display order (newest first) so the most recent bags get first pick of
@@ -227,7 +227,7 @@ export default function Pantry() {
           continue
         }
       }
-      const heroSrc = bag.photos[0]
+      const heroSrc = heroSrcFor(bag, encyclopediaById)
       const aspect = heroSrc ? photoAspects.get(heroSrc) : undefined
 
       let pool: FrameDef[]
@@ -271,7 +271,18 @@ export default function Pantry() {
       usage.set(best.file, (usage.get(best.file) ?? 0) + 1)
     }
     return assignment
-  }, [bags, photoAspects])
+  }, [bags, photoAspects, encyclopediaById])
+
+  // Row-major masonry: deal sorted bags across N columns round-robin (card i ->
+  // column i % N) so they read left-to-right, top-to-bottom, tightly packed.
+  const columnCount = useColumnCount()
+  const columns = useMemo(() => {
+    const cols: PantryBag[][] = Array.from({ length: columnCount }, () => [])
+    filteredBags.forEach((bag, i) => {
+      cols[i % columnCount].push(bag)
+    })
+    return cols
+  }, [filteredBags, columnCount])
 
   return (
     <main
@@ -327,25 +338,29 @@ export default function Pantry() {
             {filteredBags.length === 0 ? (
               <NoMatchesState onClear={clearFilters} />
             ) : (
-              <ul className="columns-1 md:columns-2 xl:columns-3 gap-x-4 md:gap-x-5">
-                {filteredBags.map((bag) => {
-                  const assigned = frameAssignment.get(bag.slug)
-                  return (
-                    <li key={bag.slug} className="mb-6 md:mb-8 break-inside-avoid">
-                      <BagCard
-                        bag={bag}
-                        store={stores.get(bag.storeNumber)}
-                        encyclopediaEntry={
-                          bag.encyclopediaId ? encyclopediaById.get(bag.encyclopediaId) : undefined
-                        }
-                        assignedFrame={assigned?.frame}
-                        stretchTo={assigned?.stretchTo ?? null}
-                        plaqueBg={plaqueBg}
-                      />
-                    </li>
-                  )
-                })}
-              </ul>
+              <div className="flex items-start gap-x-4 md:gap-x-5">
+                {columns.map((col, ci) => (
+                  <div key={ci} className="flex-1 min-w-0">
+                    {col.map((bag) => {
+                      const assigned = frameAssignment.get(bag.slug)
+                      return (
+                        <div key={bag.slug} className="mb-6 md:mb-8">
+                          <BagCard
+                            bag={bag}
+                            store={stores.get(bag.storeNumber)}
+                            encyclopediaEntry={
+                              bag.encyclopediaId ? encyclopediaById.get(bag.encyclopediaId) : undefined
+                            }
+                            assignedFrame={assigned?.frame}
+                            stretchTo={assigned?.stretchTo ?? null}
+                            plaqueBg={plaqueBg}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
             )}
           </>
         )}
@@ -752,14 +767,14 @@ export type FrameDef = {
 export const BAG_FRAMES: FrameDef[] = [
   { file: 'embellished.svg',       aspect: '1374 / 1831',                inset: { top: '13%',   right: '0%',    bottom: '12%',   left: '0%' },    photoAspect: 0.75 },
   { file: 'horizontal-hung.svg',   aspect: '1178 / 1146',                inset: { top: '28%',   right: '0%',    bottom: '11%',   left: '2%' },    photoAspect: 1.33 },
-  { file: 'lines-transparent.svg', aspect: '1786 / 1123',  rotate: 90,   inset: { top: '14%',   right: '19%',   bottom: '13%',   left: '8.5%' },  photoAspect: 1.78 },
-  { file: 'lines-transparent.svg', aspect: '1123 / 1786',                inset: { top: '19.5%', right: '15%',   bottom: '12%',   left: '15%' },   photoAspect: 0.5625 },
+  { file: 'lines-ivory.svg', aspect: '1786 / 1123',  rotate: 90,   inset: { top: '14%',   right: '19%',   bottom: '13%',   left: '8.5%' },  photoAspect: 1.78 },
+  { file: 'lines-ivory.svg', aspect: '1123 / 1786',                inset: { top: '19.5%', right: '15%',   bottom: '12%',   left: '15%' },   photoAspect: 0.5625 },
   { file: 'baroque-portrait.svg',  aspect: '655 / 900',                  inset: { top: '20%',   right: '2%',    bottom: '16%',   left: '5%' },    photoAspect: 0.75 },
   { file: 'baroque-landscape.svg', aspect: '800 / 447',                  inset: { top: '15%',   right: '7%',    bottom: '17%',   left: '7%' },    photoAspect: 1.78 },
   { file: 'cartouche.svg',         aspect: '600 / 506',                  inset: { top: '13%',   right: '11%',   bottom: '13%',   left: '11%' },   photoAspect: 1.33 },
   { file: 'rococo-oval.svg',       aspect: '796 / 991',                  inset: { top: '16%',   right: '18%',   bottom: '15.5%', left: '18%' },   photoAspect: 0.75 },
   { file: 'pearl-swag.svg',        aspect: '1024 / 757',                 inset: { top: '22%',   right: '13.5%', bottom: '21.5%', left: '13.5%' }, photoAspect: 1.78 },
-  { file: 'dragonfly-nest.svg',    aspect: '1272 / 1800',                inset: { top: '6%',    right: '10%',   bottom: '8%',    left: '10%' },   photoAspect: 0.75 },
+  { file: 'dragonfly-nest-ivory.svg', aspect: '1272 / 1800',             inset: { top: '6%',    right: '10%',   bottom: '8%',    left: '10%' },   photoAspect: 0.75 },
   { file: 'crested-square.svg',    aspect: '840 / 880',                  inset: { top: '17.5%', right: '21.5%', bottom: '21.5%', left: '21.5%' }, photoAspect: 0.75 },
   { file: 'crested-square.svg',    aspect: '840 / 880',                  inset: { top: '17.5%', right: '19.5%', bottom: '21.5%', left: '19%' },   photoAspect: 0.8 },
   { file: 'shell-landscape.svg',   aspect: '927 / 627',                  inset: { top: '1.5%',  right: '10%',   bottom: '0.5%',  left: '9.5%' },  photoAspect: 1.78 },
@@ -808,11 +823,11 @@ const BAG_OVERRIDES: Record<string, BagOverride> = {
   'classic-reusable-2026-05-17': { frame: 'embellished.svg' },
   'az-2026-05-15': { frame: 'baroque-landscape.svg' },
   'ky-2026-05-15': { squishY: 0.95 },
-  // Lines-transparent now defaults to landscape (rotate: 90). Fearless-flyer
+  // Lines-ivory now defaults to landscape (rotate: 90). Fearless-flyer
   // has a very tall portrait photo so we override back to the unrotated
   // portrait variant.
   'fearless-flyer-2026-05-17': {
-    frame: 'lines-transparent.svg',
+    frame: 'lines-ivory.svg',
     frameAspect: '1123 / 1786',
     frameRotate: 0,
     frameInset: { top: '19.5%', right: '15%', bottom: '12%', left: '15%' },
@@ -1042,5 +1057,38 @@ function resolvePhotoUrl(path: string | undefined): string | null {
   if (!path) return null
   if (path.startsWith('http')) return path
   return `${BASE}${path.replace(/^\//, '')}`
+}
+
+// Active masonry column count at the current viewport (md → 2, xl → 3, else 1).
+function useColumnCount(): number {
+  const getCount = () => {
+    if (typeof window === 'undefined') return 3
+    if (window.matchMedia('(min-width: 1280px)').matches) return 3
+    if (window.matchMedia('(min-width: 768px)').matches) return 2
+    return 1
+  }
+  const [count, setCount] = useState(getCount)
+  useEffect(() => {
+    const queries = ['(min-width: 1280px)', '(min-width: 768px)'].map((q) =>
+      window.matchMedia(q),
+    )
+    const update = () => setCount(getCount())
+    for (const mq of queries) mq.addEventListener('change', update)
+    return () => {
+      for (const mq of queries) mq.removeEventListener('change', update)
+    }
+  }, [])
+  return count
+}
+
+// The photo a card actually shows: Parker's own first upload, else the
+// encyclopedia reference photo. Keyed off by the aspect detector + frame picker.
+function heroSrcFor(
+  bag: PantryBag,
+  encyclopediaById: Map<string, EncyclopediaBag>,
+): string | undefined {
+  if (bag.photos[0]) return bag.photos[0]
+  const entry = bag.encyclopediaId ? encyclopediaById.get(bag.encyclopediaId) : undefined
+  return entry ? defaultReferencePhotos(entry)[0] : undefined
 }
 
