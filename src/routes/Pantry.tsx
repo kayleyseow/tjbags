@@ -122,6 +122,8 @@ export default function Pantry() {
     return TYPE_ORDER.filter((t) => present.has(t))
   }, [bags, encyclopediaById, visibility])
 
+  const displayTypes = useMemo(() => TYPE_ORDER.filter((t) => visibility[t]), [visibility])
+
   const filteredBags = useMemo(() => {
     if (!bags) return [] as PantryBag[]
     const q = query.trim().toLowerCase()
@@ -324,6 +326,7 @@ export default function Pantry() {
           <>
             <FilterBar
               availableTypes={availableTypes}
+              displayTypes={displayTypes}
               typeFilter={typeFilter}
               onToggleType={toggleType}
               onClearTypes={clearTypes}
@@ -409,6 +412,72 @@ const CATEGORY_STAT_ORDER: { key: BagType; label: string }[] = [
   { key: 'standard', label: 'Standard Bags' },
 ]
 
+// Focal single-category stat: a long bar with the count and percentage counting
+// up in sync as it fills. Re-runs on hover. One rAF drives progress 0→1 so the
+// number, percentage, and bar width stay locked together.
+function FeaturedStat({
+  label,
+  collected,
+  total,
+}: {
+  label: string
+  collected: number
+  total: number
+}) {
+  const target = total > 0 ? Math.min(100, (collected / total) * 100) : 0
+  const [progress, setProgress] = useState(0)
+  const [runId, setRunId] = useState(0)
+
+  useEffect(() => {
+    setProgress(0)
+    let raf = 0
+    let start: number | null = null
+    const tick = (t: number) => {
+      if (start === null) start = t
+      const p = Math.min(1, (t - start) / 1200)
+      setProgress(1 - Math.pow(1 - p, 3))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [runId])
+
+  const count = Math.round(progress * collected)
+  const pct = Math.round(progress * target)
+
+  return (
+    <section
+      aria-label={`${label} progress`}
+      onMouseEnter={() => setRunId((r) => r + 1)}
+      className="mb-16 mt-2 mx-auto w-full max-w-[33.6rem] border-y-2 border-[var(--tj-ink)] px-4 py-8 text-center"
+    >
+      <p className="font-[var(--tj-body)] tracking-[0.35em] text-[0.7rem] uppercase font-semibold opacity-60 mb-5">
+        {label}
+      </p>
+      <div className="flex items-baseline justify-center gap-2 mb-6">
+        <span className="text-6xl md:text-7xl leading-none font-bold text-[var(--tj-red)] tabular-nums">
+          {count}
+        </span>
+        <span className="text-2xl md:text-3xl leading-none font-[var(--tj-body)] text-[var(--tj-ink)] opacity-75 tabular-nums">
+          / {total}
+        </span>
+      </div>
+      <div
+        role="progressbar"
+        aria-valuenow={Math.round(target)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="h-3 w-full bg-[var(--tj-ink)]/15 overflow-hidden"
+      >
+        <div className="h-full bg-[var(--tj-red)]" style={{ width: `${progress * target}%` }} />
+      </div>
+      <p className="mt-4 font-[var(--tj-body)] tracking-[0.25em] text-xs uppercase opacity-60 tabular-nums">
+        {pct}% collected
+      </p>
+    </section>
+  )
+}
+
 function StatsRow({
   stats,
   visibility,
@@ -424,8 +493,11 @@ function StatsRow({
     collected?: number
     total?: number
   }
+  const showTotal = visibleCategories.length >= 2
   const cells: Cell[] = [
-    { key: 'totalBags', value: String(stats.totalBags), label: 'In the Pantry' },
+    ...(showTotal
+      ? [{ key: 'totalBags', value: String(stats.totalBags), label: 'In the Pantry' }]
+      : []),
     ...visibleCategories.map(({ key, label }) => {
       const { collected, total } = stats.byType[key]
       return {
@@ -437,6 +509,13 @@ function StatsRow({
       }
     }),
   ]
+
+  const single = cells.length === 1 ? cells[0] : null
+  if (single && single.collected != null && single.total != null) {
+    return (
+      <FeaturedStat label={single.label} collected={single.collected} total={single.total} />
+    )
+  }
 
   return (
     <div className="mb-12 mx-auto w-fit max-w-full border-y-2 border-[var(--tj-ink)] font-[var(--tj-body)] font-semibold tracking-[0.18em] text-sm">
@@ -490,9 +569,7 @@ function Stat({
         {value}
       </strong>
       <span className="text-[0.7rem]">{label.toUpperCase()}</span>
-      {hasProgress && (
-        <ProgressBar collected={collected!} total={total!} label={label} />
-      )}
+      {hasProgress && <ProgressBar collected={collected!} total={total!} label={label} />}
     </div>
   )
 }
@@ -551,6 +628,7 @@ const TYPE_PILL_LABEL: Record<BagType, string> = {
 
 function FilterBar({
   availableTypes,
+  displayTypes,
   typeFilter,
   onToggleType,
   onClearTypes,
@@ -563,6 +641,7 @@ function FilterBar({
   filtersActive,
 }: {
   availableTypes: BagType[]
+  displayTypes: BagType[]
   typeFilter: TypeFilter
   onToggleType: (t: BagType) => void
   onClearTypes: () => void
@@ -574,27 +653,41 @@ function FilterBar({
   totalCount: number
   filtersActive: boolean
 }) {
+  const isFilterable = availableTypes.length >= 2
+  const showTypeRow = displayTypes.length >= 2
   return (
     <div className="max-w-[720px] mx-auto mb-10 space-y-4">
-      <div
-        role="group"
-        aria-label="Filter by type — toggle any combination"
-        className="flex flex-wrap items-center justify-center gap-2"
-      >
-        <TypePill active={typeFilter.size === 0} onClick={onClearTypes}>
-          All
-        </TypePill>
-        {availableTypes.map((t) => (
-          <TypePill
-            key={t}
-            active={typeFilter.has(t)}
-            onClick={() => onToggleType(t)}
-            checkable
-          >
-            {TYPE_PILL_LABEL[t]}
+      {showTypeRow && (
+        <div
+          role="group"
+          aria-label={
+            isFilterable ? 'Filter by type — toggle any combination' : 'Bag types in this collection'
+          }
+          className="flex flex-wrap items-center justify-center gap-2"
+        >
+        {isFilterable && (
+          <TypePill active={typeFilter.size === 0} onClick={onClearTypes}>
+            All
           </TypePill>
-        ))}
-      </div>
+        )}
+        {displayTypes.map((t) => {
+          const disabled = !availableTypes.includes(t)
+          const asCurrent = !isFilterable && !disabled
+          return (
+            <TypePill
+              key={t}
+              active={asCurrent || typeFilter.has(t)}
+              onClick={() => onToggleType(t)}
+              checkable
+              disabled={disabled}
+              readOnly={asCurrent}
+            >
+              {TYPE_PILL_LABEL[t]}
+            </TypePill>
+          )
+        })}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <label className="flex-1 min-w-[14rem] max-w-md">
@@ -633,6 +726,8 @@ function TypePill({
   active,
   onClick,
   checkable = false,
+  disabled = false,
+  readOnly = false,
   children,
 }: {
   active: boolean
@@ -640,26 +735,35 @@ function TypePill({
   /** Render with a checkbox indicator and use aria-pressed instead of the
       "All" pill's plain-button semantics. Signals the user can toggle on/off. */
   checkable?: boolean
+  disabled?: boolean
+  readOnly?: boolean
   children: React.ReactNode
 }) {
+  const interactive = !disabled && !readOnly
   return (
     <button
       type="button"
-      aria-pressed={checkable ? active : undefined}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 font-[var(--tj-body)] tracking-[0.18em] sm:tracking-[0.22em] text-[0.65rem] sm:text-[0.7rem] uppercase font-semibold px-3 sm:px-3.5 py-1.5 sm:py-2 border-2 border-[var(--tj-ink)] transition-colors ${
-        active
-          ? 'bg-[var(--tj-ink)] text-[var(--tj-cream)]'
-          : 'bg-[var(--tj-cream)] hover:bg-[var(--tj-ink)]/10'
-      }`}
+      disabled={disabled}
+      aria-pressed={checkable && !disabled ? active : undefined}
+      aria-current={readOnly ? 'true' : undefined}
+      onClick={interactive ? onClick : undefined}
+      className={`inline-flex items-center gap-1.5 font-[var(--tj-body)] tracking-[0.18em] sm:tracking-[0.22em] text-[0.65rem] sm:text-[0.7rem] uppercase font-semibold px-3 sm:px-3.5 py-1.5 sm:py-2 border-2 transition-colors ${
+        disabled
+          ? 'bg-[var(--tj-ink)]/10 border-[var(--tj-ink)]/30 text-[var(--tj-ink)]/40 cursor-not-allowed'
+          : active
+            ? 'bg-[var(--tj-ink)] border-[var(--tj-ink)] text-[var(--tj-cream)]'
+            : 'bg-[var(--tj-cream)] border-[var(--tj-ink)] hover:bg-[var(--tj-ink)]/10'
+      } ${readOnly ? 'cursor-default' : ''}`}
     >
       {checkable && (
         <span
           aria-hidden
           className={`inline-flex items-center justify-center w-3.5 h-3.5 border-2 transition-colors ${
-            active
-              ? 'border-[var(--tj-cream)] bg-[var(--tj-cream)] text-[var(--tj-ink)]'
-              : 'border-[var(--tj-ink)] text-transparent'
+            disabled
+              ? 'border-[var(--tj-ink)]/30 text-transparent'
+              : active
+                ? 'border-[var(--tj-cream)] bg-[var(--tj-cream)] text-[var(--tj-ink)]'
+                : 'border-[var(--tj-ink)] text-transparent'
           }`}
         >
           <svg viewBox="0 0 12 12" className="w-2.5 h-2.5">
@@ -973,7 +1077,7 @@ function BagCard({
             src={`${BASE}decor/frames/${frame.file}`}
             alt=""
             aria-hidden
-            className="absolute pointer-events-none select-none"
+            className="absolute pointer-events-none select-none [filter:drop-shadow(0_2px_1px_rgba(42,31,20,0.22))_drop-shadow(0_5px_6px_rgba(42,31,20,0.28))]"
             style={frameImgStyle(
               frame.rotate ?? 0,
               override.frameShiftY,
@@ -987,9 +1091,11 @@ function BagCard({
       {/* Gallery plaque — engraved-nameplate aesthetic: cream title cartouche
           at the top sitting on a navy body. Mounted flat below the framed
           photo for a museum-installation feel. */}
-      <div className="mt-4 mx-auto max-w-[360px]">
-        <div
-          className="relative border-4 border-double border-[var(--tj-cream)]/40 overflow-hidden shadow-[0_2px_0_rgba(42,31,20,0.20),0_8px_16px_-8px_rgba(42,31,20,0.35)]"
+      <div className="group mt-4 mx-auto max-w-[360px]">
+        <Link
+          to={`/bags/${bag.slug}`}
+          aria-label={`View detail for ${bag.name ?? bag.slug}`}
+          className="block relative border-4 border-double border-[var(--tj-cream)]/40 overflow-hidden shadow-[0_2px_0_rgba(42,31,20,0.20),0_8px_16px_-8px_rgba(42,31,20,0.35)] transition-[transform,border-color] duration-300 ease-out group-hover:border-[var(--tj-cream)]/90 active:scale-[0.98] active:duration-75"
           style={{ backgroundColor: plaqueBg }}
         >
           {/* Title cartouche — cream highlight band */}
@@ -999,9 +1105,7 @@ function BagCard({
               className="text-[var(--tj-red)] text-2xl md:text-3xl leading-none text-balance break-words hyphens-auto text-center"
               style={{ fontFamily: 'var(--tj-script)' }}
             >
-              <Link to={`/bags/${bag.slug}`} className="hover:opacity-80 transition-opacity">
-                {bag.name ?? 'Untitled Bag'}
-              </Link>
+              {bag.name ?? 'Untitled Bag'}
             </h3>
           </div>
 
@@ -1020,7 +1124,7 @@ function BagCard({
                   <span className="text-[var(--tj-red)] text-[0.7rem] leading-none">✦</span>
                   <span className="h-px w-9 bg-[var(--tj-cream)]" />
                 </div>
-                <blockquote className="italic text-[0.85rem] md:text-sm text-center leading-tight opacity-90">
+                <blockquote className="text-sm md:text-base text-center leading-snug opacity-90">
                   “{bag.memory}”
                   <footer className="mt-1 font-[var(--tj-body)] tracking-[0.25em] text-[0.55rem] uppercase font-semibold opacity-70 not-italic">
                     — Parker
@@ -1029,7 +1133,7 @@ function BagCard({
               </>
             )}
           </div>
-        </div>
+        </Link>
       </div>
 
       {usingFallbackPhotos && (

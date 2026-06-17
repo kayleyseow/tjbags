@@ -225,8 +225,9 @@ export type CategoryVisibility = {
   standard: boolean
 }
 
+// special/standard start empty, so default them hidden until Parker opts in.
 export const DEFAULT_VISIBILITY: CategoryVisibility = {
   state: true,
-  special: true,
-  standard: true,
+  special: false,
+  standard: false,
 }

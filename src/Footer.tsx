@@ -78,8 +78,17 @@ export default function Footer() {
           </span>
           <span>
             Stocked for Parker
-            {bagCount !== null &&
-              ` · ${bagCount} ${bagCount === 1 ? 'Bag' : 'Bags'} in da Pantry`}
+            {bagCount !== null && (
+              <>
+                {' · '}
+                <Link
+                  to="/pantry"
+                  className="underline-offset-4 hover:underline hover:text-[var(--tj-red)] transition-colors"
+                >
+                  {bagCount} {bagCount === 1 ? 'Bag' : 'Bags'} in da Pantry
+                </Link>
+              </>
+            )}
             {' · Est. 2026'}
           </span>
           <span aria-hidden className="text-[var(--tj-red)]">

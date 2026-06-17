@@ -1,5 +1,5 @@
 {
   "state": true,
-  "special": true,
-  "standard": true
+  "special": false,
+  "standard": false
 }
