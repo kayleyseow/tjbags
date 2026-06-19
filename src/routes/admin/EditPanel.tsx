@@ -8,6 +8,7 @@ import type {
 import { DEFAULT_VISIBILITY } from '../../types'
 import StoreSelect from './StoreSelect'
 import { looksLikeHeic, normalizeImageFile } from './heic'
+import { parseLocalDate } from '../../dates'
 
 const BASE = import.meta.env.BASE_URL
 const WORKER_URL = import.meta.env.VITE_WORKER_URL
@@ -844,7 +845,7 @@ function groupEncyclopedia(
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return parseLocalDate(iso).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

@@ -13,6 +13,7 @@ import TopNav from '../TopNav'
 import Footer from '../Footer'
 import StoreChip from '../StoreChip'
 import { defaultReferencePhotos } from '../bagPhotos'
+import { parseLocalDate } from '../dates'
 import { US_LOCALES } from '../usLocales'
 import { useTitle } from '../useTitle'
 
@@ -1147,7 +1148,7 @@ function BagCard({
 
 function formatShortDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return parseLocalDate(iso).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

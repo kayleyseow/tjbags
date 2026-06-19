@@ -4,6 +4,7 @@ import type { EncyclopediaBag, PantryBag, Store } from '../types'
 import {
   ANGLE_LABEL,
   ANGLE_ORDER,
+  defaultReferencePhotos,
   inferAngleMap,
   photoUrl,
 } from '../bagPhotos'
@@ -14,6 +15,7 @@ import Footer from '../Footer'
 import MaterialChips from '../MaterialChips'
 import StoreChip from '../StoreChip'
 import { useTitle } from '../useTitle'
+import { parseLocalDate } from '../dates'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -87,7 +89,17 @@ function BagView({
   // upload flow (filenames like `{slug}-{randomId}.jpg`). Treat them
   // uniformly as a slide list — angle-tagged when filenames opt in,
   // otherwise plain ordered "Photo 1, Photo 2, …".
-  const slides = useMemo(() => buildSlides(bag.photos, design), [bag.photos, design])
+  // When Parker hasn't uploaded her own photos, fall back to the catalog's
+  // front/back reference shots so the entry isn't blank. `usingReference`
+  // flags the fallback so we can quietly label it as not-her-own.
+  const usingReference = bag.photos.length === 0
+  const slides = useMemo(
+    () =>
+      usingReference
+        ? buildReferenceSlides(encyclopediaEntry)
+        : buildSlides(bag.photos, design),
+    [usingReference, bag.photos, design, encyclopediaEntry],
+  )
   const [idx, setIdx] = useState(0)
   const scrollerRef = useRef<HTMLDivElement>(null)
 
@@ -147,7 +159,13 @@ function BagView({
           to="/pantry"
           className="inline-flex items-center gap-2 mt-6 font-[var(--tj-body)] tracking-[0.22em] text-[0.65rem] uppercase font-semibold opacity-65 hover:opacity-100 hover:text-[var(--tj-red)] transition-colors"
         >
-          <span aria-hidden>←</span> Back to the Pantry
+          <img
+            src={`${BASE}decor/icons/finger-point-left.svg`}
+            alt=""
+            aria-hidden
+            className="h-3 w-auto opacity-80 select-none"
+          />
+          Back to the Pantry
         </Link>
 
         {/* Journal layout: photo column on the left, Parker's-side story on the
@@ -158,7 +176,7 @@ function BagView({
           <section>
             <div
               className="relative mx-auto bg-[var(--tj-cream-dark)] border-2 border-[var(--tj-ink)] overflow-hidden"
-              style={{ aspectRatio: panelAspect, maxWidth: '440px', maxHeight: '80vh' }}
+              style={{ aspectRatio: panelAspect, maxWidth: '360px', maxHeight: '72vh' }}
             >
               <PanelGrain />
               {slides.length > 0 ? (
@@ -216,6 +234,12 @@ function BagView({
               </p>
             )}
 
+            {usingReference && slides.length > 0 && (
+              <p className="text-center mt-4 font-[var(--tj-body)] tracking-[0.22em] text-[0.6rem] uppercase font-semibold opacity-50">
+                Catalog reference photo · Parker’s own coming soon
+              </p>
+            )}
+
             {slides.length > 1 && (
               <div className="flex justify-center gap-2 mt-5 flex-wrap">
                 {slides.map((s, i) => {
@@ -240,9 +264,11 @@ function BagView({
           </section>
 
           {/* RIGHT — journal-side info */}
-          <section className="flex flex-col gap-7">
+          <section className="flex flex-col gap-8">
+            {/* Name — the type is kept as a quiet label so the personal
+                content below carries the visual weight. */}
             <header>
-              <p className="font-[var(--tj-body)] tracking-[0.4em] text-xs uppercase font-semibold border border-[var(--tj-ink)] inline-block px-3 py-1 mb-5">
+              <p className="font-[var(--tj-body)] tracking-[0.4em] text-[0.7rem] uppercase font-semibold opacity-55 mb-3">
                 {encyclopediaTypeLabel(encyclopediaEntry)}
               </p>
 
@@ -252,35 +278,54 @@ function BagView({
               >
                 {displayName}
               </h1>
-
-              <MaterialChips materials={encyclopediaEntry?.materials} className="mt-5" />
-
-              {encyclopediaEntry && (
-                <Link
-                  to={`/encyclopedia/${encyclopediaEntry.id}`}
-                  className="inline-flex items-center gap-2 mt-5 font-[var(--tj-body)] tracking-[0.22em] text-[0.65rem] uppercase font-semibold underline-offset-4 hover:underline opacity-75 hover:opacity-100"
-                >
-                  View encyclopedia entry
-                  <span aria-hidden>→</span>
-                </Link>
-              )}
             </header>
 
+            {/* When & where — a journal-style dateline leading the entry. */}
+            <dl className="border-t border-[var(--tj-ink)]/30 pt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <dt className="font-[var(--tj-body)] tracking-[0.3em] text-[0.6rem] uppercase font-bold opacity-55 mb-2">
+                  Acquired
+                </dt>
+                <dd className="font-[var(--tj-body)] text-base">
+                  {formatDate(bag.dateAcquired)}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-[var(--tj-body)] tracking-[0.3em] text-[0.6rem] uppercase font-bold opacity-55 mb-2">
+                  Found at
+                </dt>
+                <dd className="text-sm">
+                  <StoreChip storeNumber={bag.storeNumber} store={store} />
+                </dd>
+              </div>
+            </dl>
+
+            {/* Parker's note — the centerpiece, landing after the dateline. */}
             {bag.memory && (
               <div className="border-t border-[var(--tj-ink)]/30 pt-6">
-                <h2 className="font-[var(--tj-body)] tracking-[0.3em] text-[0.7rem] uppercase font-bold mb-3 opacity-80">
+                <h2 className="font-[var(--tj-body)] tracking-[0.3em] text-[0.7rem] uppercase font-bold mb-3 opacity-70">
                   Parker’s note
                 </h2>
-                <p className="italic text-base md:text-lg leading-relaxed">
+                <p className="italic text-lg md:text-xl leading-relaxed border-l-2 border-[var(--tj-red)]/50 pl-4">
                   “{bag.memory}”
                 </p>
               </div>
             )}
 
-            <footer className="border-t border-[var(--tj-ink)]/30 pt-6 flex items-start justify-between font-[var(--tj-body)] tracking-[0.22em] font-semibold text-[0.65rem] uppercase opacity-75 flex-wrap gap-3">
-              <span>Acquired {formatDate(bag.dateAcquired)}</span>
-              <StoreChip storeNumber={bag.storeNumber} store={store} />
-            </footer>
+            {/* Catalog cross-reference — materials + the encyclopedia link,
+                demoted to a quiet footer beneath the personal details. */}
+            <div className="border-t border-[var(--tj-ink)]/20 pt-6 flex flex-col gap-4">
+              <MaterialChips materials={encyclopediaEntry?.materials} />
+              {encyclopediaEntry && (
+                <Link
+                  to={`/encyclopedia/${encyclopediaEntry.id}`}
+                  className="inline-flex items-center gap-2 font-[var(--tj-body)] tracking-[0.22em] text-[0.65rem] uppercase font-semibold underline-offset-4 hover:underline opacity-70 hover:opacity-100"
+                >
+                  See this bag in the encyclopedia
+                  <span aria-hidden>→</span>
+                </Link>
+              )}
+            </div>
           </section>
         </div>
       </div>
@@ -310,6 +355,22 @@ function buildSlides(photos: string[], design: DesignFields): Slide[] {
   return photos.map((p, i) => ({ url: photoUrl(p), label: `${i + 1}` }))
 }
 
+// Fallback slides drawn from the encyclopedia's reference photos when Parker
+// has no photos of her own — just the front and back so the diary stays
+// lighter than the full-angle encyclopedia viewer.
+function buildReferenceSlides(entry: EncyclopediaBag | undefined): Slide[] {
+  if (!entry) return []
+  const refs = defaultReferencePhotos(entry)
+  const angleMap = inferAngleMap(refs)
+  const slides = (['front', 'back'] as const)
+    .filter((a) => angleMap[a])
+    .map((a) => ({ url: photoUrl(angleMap[a]!), label: ANGLE_LABEL[a] }))
+  // If the reference photos don't follow the front/back naming, show the
+  // first couple in order rather than nothing.
+  if (slides.length) return slides
+  return refs.slice(0, 2).map((p, i) => ({ url: photoUrl(p), label: `${i + 1}` }))
+}
+
 function encyclopediaTypeLabel(entry: EncyclopediaBag | undefined): string {
   if (!entry) return 'Unencyclopediaed Bag'
   if (entry.type === 'state') return `${entry.state ?? 'State'} ★ State Bag`
@@ -319,7 +380,7 @@ function encyclopediaTypeLabel(entry: EncyclopediaBag | undefined): string {
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return parseLocalDate(iso).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
