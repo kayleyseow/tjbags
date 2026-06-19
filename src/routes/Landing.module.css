@@ -1,8 +1,8 @@
 .bag {
-  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
-  padding: 1rem 2rem 1.75rem;
+  padding: 1rem 2rem 2.25rem;
   color: var(--tj-ink);
 
   background-color: var(--tj-kraft);
@@ -47,7 +47,7 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  min-height: calc(100vh - 6rem);
+  min-height: calc(100dvh - 6.5rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -217,8 +217,19 @@
 .sealComposite {
   position: relative;
   display: block;
-  width: clamp(22rem, 44vw, 36rem);
+  /* The vh term caps the seal by viewport *height* so the hero + footer fit
+     without scrolling on shorter laptops; 44vw keeps it from overgrowing on
+     wide screens, 36rem is the ceiling on tall ones. */
+  width: clamp(18rem, min(44vw, 54vh), 36rem);
   aspect-ratio: 1;
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Once "Just Browsing" reveals the extra CTAs, the seal recedes so the
+   welcome line, browse buttons, and footer all fit without scrolling.
+   The height terms (vh) keep it fitting on shorter laptop viewports. */
+.browsing .sealComposite {
+  width: clamp(15rem, min(40vw, 40vh), 28rem);
 }
 
 .sealImage {
@@ -505,5 +516,30 @@
   .cta, .cta::before, .cta::after {
     transition: none !important;
   }
+  .sealComposite {
+    transition: none !important;
+  }
   .cta:hover { transform: none !important; }
+}
+
+/* Phones stack both button rows, so the "just browsing" state is the tightest
+   vertical layout on the whole site. Trim padding/gaps and shrink the seal
+   harder here so the welcome line, browse buttons, and footer clear the fold.
+   Placed last so the seal override wins over the base .browsing rule. */
+@media (max-width: 720px) {
+  .bag {
+    gap: 1.25rem;
+    padding: 0.75rem 1.25rem 2rem;
+  }
+  .firstScreen { gap: 0.85rem; }
+  .parkerQuestion {
+    gap: 1rem;
+    margin-top: 0.25rem;
+  }
+  .yesNoRow { gap: 0.65rem; }
+  .yesNoRow .cta { min-height: 3.25rem; }
+  .ctaRow { gap: 0.65rem; }
+  .revealedSlot { gap: 1rem; }
+  .browsing .cta { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .browsing .sealComposite { width: clamp(9rem, 30vh, 12.5rem); }
 }

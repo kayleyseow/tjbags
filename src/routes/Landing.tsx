@@ -11,7 +11,7 @@ export default function Landing() {
   const [revealed, setRevealed] = useState(false)
 
   return (
-    <main className={styles.bag}>
+    <main className={`${styles.bag} ${revealed ? styles.browsing : ''}`}>
       <CrumpleOverlay />
       <div className={styles.utensils} aria-hidden>
         <img className={styles.spoon} src={`${BASE}decor/icons/spoon.svg`} alt="" />
