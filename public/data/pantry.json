@@ -124,5 +124,14 @@
     "dateAcquired": "2026-07-02",
     "memory": "My dad got it for me on a work trip!",
     "photos": []
+  },
+  {
+    "slug": "ri-2026-07-03",
+    "encyclopediaId": "ri",
+    "name": "Rhode Island",
+    "storeNumber": "518",
+    "dateAcquired": "2026-07-03",
+    "memory": "Picked up on the way to visit my friend Joelle in Boston! (Friend from high school)",
+    "photos": []
   }
 ]
