@@ -133,5 +133,14 @@
     "dateAcquired": "2026-07-03",
     "memory": "Picked up on the way to visit my friend Joelle in Boston! (Friend from high school)",
     "photos": []
+  },
+  {
+    "slug": "nh-2026-07-03",
+    "encyclopediaId": "nh",
+    "name": "New Hampshire",
+    "storeNumber": "507",
+    "dateAcquired": "2026-07-03",
+    "memory": "Took a detour on the way to visit my friend Joelle in Boston!",
+    "photos": []
   }
 ]
